@@ -1,0 +1,1 @@
+from qtmvvm.observable_property import ObservableProperty
