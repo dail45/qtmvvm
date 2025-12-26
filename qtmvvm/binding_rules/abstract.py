@@ -13,8 +13,8 @@ if TYPE_CHECKING:
 
 
 class AbstractBindingRule(ABC):
-    def __init__(self, initial_signal: Signal = None):
-        self._initial_signal = initial_signal
+    def __init__(self, signal: Signal = None):
+        self._initial_signal = signal
 
     @abstractmethod
     def propertyToWidget(
