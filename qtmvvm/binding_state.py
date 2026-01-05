@@ -11,7 +11,7 @@ class BindingState:
             property: str = None,
             signal: Signal = None
     ):
-        self.weakRef = weakref.ref(widget)
+        self.weakRef = weakref.ref(widget or object)
         self.valueEditing = False
         self.property = property
         self.signal = signal

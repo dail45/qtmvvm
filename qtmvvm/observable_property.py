@@ -1,5 +1,4 @@
-import weakref
-from typing import Generic, TypeVar, Literal
+from typing import Generic, TypeVar, Literal, Callable, Any
 
 from qtpy.QtWidgets import QWidget
 from qtpy.QtCore import QObject, Signal
@@ -10,10 +9,10 @@ from qtmvvm.binding_rules import AbstractBindingRule, PropertyBindingRule, Signa
 T = TypeVar("T")
 
 class ObservableProperty(QObject, Generic[T]):
-    valueChanged = Signal()
+    valueChanged = Signal(object)
 
-    def __init__(self, value: T):
-        super().__init__()
+    def __init__(self, value: T, parent: Any = None):
+        super().__init__(parent)
         self._value = value
 
     # Signal connecting functions
@@ -21,7 +20,6 @@ class ObservableProperty(QObject, Generic[T]):
             self,
             widget: QWidget,
             property: str,
-            *,
             bindingRule: AbstractBindingRule = PropertyBindingRule(),
             mode: Literal["1-way", "2-way"] = "2-way"
     ):
@@ -35,7 +33,14 @@ class ObservableProperty(QObject, Generic[T]):
         if mode != "2-way":
             return
         if bindingState.signal is not None:
-            bindingState.signal.connect(lambda *args: self._onSignal(bindingState, bindingRule, *args))
+            bindingState.signal.connect(self._onSignalBind(bindingState, bindingRule))
+
+    def bindSignal(
+            self,
+            signal: Signal,
+            modifyFunc: Callable[[Any], Any] = None
+    ):
+        signal.connect(self._onSignalBind(BindingState(None, None, signal), SignalBindingRule(), modifyFunc))
 
     def _onValueChanged(self, state: BindingState, bindingRule: AbstractBindingRule):
         if state.valueEditing:
@@ -43,12 +48,25 @@ class ObservableProperty(QObject, Generic[T]):
         with state:
             bindingRule.propertyToWidget(self, state)
 
-    def _onSignal(self, state: BindingState, bindingRule: AbstractBindingRule, *args):
+    def _onSignal(self, state: BindingState, bindingRule: AbstractBindingRule, signal_value):
         if state.valueEditing:
             return
         with state:
-            state.signal_value = args[0] if len(args) == 1 else None if len(args) == 0 else args
+            state.signal_value = signal_value
             bindingRule.widgetToProperty(self, state)
+
+    def _onSignalBind(
+            self,
+            bindingState: BindingState,
+            bindingRule: AbstractBindingRule,
+            modifyFunc: Callable[[Any], Any] = None
+    ):
+        def signalBindFunc(*args):
+            signal_value = args[0] if len(args) == 1 else None if len(args) == 0 else args
+            if modifyFunc is not None:
+                signal_value = modifyFunc(signal_value)
+            self._onSignal(bindingState, bindingRule, signal_value)
+        return signalBindFunc
 
     # Proxy functions
     @property
@@ -58,7 +76,7 @@ class ObservableProperty(QObject, Generic[T]):
     @value.setter
     def value(self, value: T):
         self._value = value
-        self.valueChanged.emit()
+        self.valueChanged.emit(value)
 
     def set(self, value: T):
         self.value = value
