@@ -1,0 +1,16 @@
+[project]
+name = "qtmvvm"
+version = "1.0.0"
+description = "MVVM library for Qt with observable properties and data bindings."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "qtpy>=2.4.3",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["qtmvvm"]
