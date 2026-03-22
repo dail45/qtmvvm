@@ -145,6 +145,50 @@ abs(x)      # 6.0
 
 `ComputedProperty` is a read-only property that automatically updates when its dependencies change.
 
+### `@computed_property` Decorator
+
+Convenient decorator for creating computed properties in ViewModel.
+
+```python
+from qtmvvm import BaseViewModel, computed_property
+
+class PersonViewModel(BaseViewModel):
+    first_name: str = "John"
+    last_name: str = "Doe"
+    age: int = 25
+
+    @computed_property(depends_on=["first_name", "last_name"])
+    def full_name(self):
+        return f"{self.first_name} {self.last_name}"
+
+    @computed_property(depends_on=["age"])
+    def is_adult(self):
+        return self.age >= 18
+
+    @computed_property(depends_on=["full_name", "is_adult"])
+    def display_info(self):
+        status = "adult" if self.is_adult else "child"
+        return f"{self.full_name} ({status})"
+
+vm = PersonViewModel()
+print(vm.full_name)      # "John Doe"
+print(vm.is_adult)       # True
+print(vm.display_info)   # "John Doe (adult)"
+
+vm.age = 17
+print(vm.is_adult)       # False (auto-updated)
+print(vm.display_info)   # "John Doe (child)"
+```
+
+**Parameters:**
+- `depends_on` — list of property/method names that the computed property depends on
+
+**Features:**
+- Automatically recalculates when dependencies change
+- Read-only (cannot set value)
+- Supports dependency chains
+- Detects circular dependencies
+
 ### Using Decorator
 
 ```python
@@ -184,6 +228,65 @@ sum_prop = ComputedProperty(
 )
 
 print(sum_prop.value)  # 15
+```
+
+### Advanced Examples
+
+**Chained computed properties:**
+
+```python
+class CalculatorViewModel(BaseViewModel):
+    base: int = 10
+    multiplier: int = 2
+
+    @computed_property(depends_on=["base", "multiplier"])
+    def product(self):
+        return self.base * self.multiplier
+
+    @computed_property(depends_on=["product"])
+    def product_doubled(self):
+        return self.product * 2
+
+vm = CalculatorViewModel()
+print(vm.product)          # 20
+print(vm.product_doubled)  # 40
+
+vm.multiplier = 5
+print(vm.product)          # 50 (auto-updated)
+print(vm.product_doubled)  # 100 (cascading update)
+```
+
+**Form validation:**
+
+```python
+class LoginViewModel(BaseViewModel):
+    username: str = ""
+    password: str = ""
+    password_confirm: str = ""
+
+    @computed_property(depends_on=["username"])
+    def username_valid(self):
+        return len(self.username) >= 3
+
+    @computed_property(depends_on=["password"])
+    def password_valid(self):
+        return len(self.password) >= 8
+
+    @computed_property(depends_on=["password", "password_confirm"])
+    def passwords_match(self):
+        return self.password == self.password_confirm
+
+    @computed_property(depends_on=["username_valid", "password_valid", "passwords_match"])
+    def form_valid(self):
+        return self.username_valid and self.password_valid and self.passwords_match
+
+vm = LoginViewModel()
+print(vm.form_valid)  # False
+
+vm.username = "john"
+vm.password = "secret123"
+vm.password_confirm = "secret123"
+print(vm.form_valid)  # True
 ```
 
 ### Features
@@ -366,7 +469,47 @@ prop.bindText(edit, mode="2-way")  # Bidirectional sync (default)
 
 ## Command
 
-`Command` wraps ViewModel methods for easy button/signal binding with automatic state management.
+`Command` wraps ViewModel methods for easy binding to buttons/signals with automatic state management.
+
+### `@command` Decorator
+
+Decorator for turning ViewModel methods into commands with support for button and signal binding.
+
+```python
+from qtmvvm import BaseViewModel, command
+from qtpy.QtWidgets import QPushButton
+
+class CounterViewModel(BaseViewModel):
+    count: int = 0
+
+    @command
+    def increment(self):
+        self.count += 1
+
+    @command
+    def decrement(self):
+        self.count -= 1
+
+    @command
+    def reset(self):
+        self.count = 0
+
+vm = CounterViewModel()
+
+# Bind to buttons
+inc_btn = QPushButton("+")
+dec_btn = QPushButton("-")
+reset_btn = QPushButton("Reset")
+
+vm.increment << inc_btn    # Click → increment()
+vm.decrement << dec_btn    # Click → decrement()
+vm.reset << reset_btn      # Click → reset()
+```
+
+**Features:**
+- Automatic button disabling during execution
+- Support for sync and async methods
+- `started` and `finished` signals for state tracking
 
 ### Basic Usage
 
@@ -411,30 +554,63 @@ timer.timeout << vm.increment  # Increment on each timeout
 
 ### Async Commands
 
+`@command` automatically detects async methods and executes them in a background thread.
+
 ```python
 from qtmvvm import BaseViewModel, command
+import asyncio
 
-class MainViewModel(BaseViewModel):
-    status: str = ""
+class DataViewModel(BaseViewModel):
+    data: str = ""
+    is_loading: bool = False
 
     @command
-    async def load_data(self):
-        # Async operation
-        import asyncio
-        await asyncio.sleep(1)
-        self.status = "Loaded!"
+    async def load_data(self, url: str):
+        self.is_loading = True
+        try:
+            # Simulate network request
+            await asyncio.sleep(1)
+            self.data = f"Data from {url}"
+        finally:
+            self.is_loading = False
+
+vm = DataViewModel()
+
+# Button automatically disables during loading
+load_btn = QPushButton("Load")
+vm.load_data << load_btn
+
+# Track state
+vm.load_data.started.connect(lambda: print("Loading started"))
+vm.load_data.finished.connect(lambda: print("Loading finished"))
 ```
 
-### Command State
+### Command Signals
 
 ```python
 cmd = vm.load_data
 
-print(cmd.is_running)  # Check if running
-
+# Subscribe to events
 cmd.started.connect(lambda: print("Started"))
 cmd.finished.connect(lambda: print("Finished"))
+
+# Check state
+print(cmd.is_running)  # True during execution
 ```
+
+### Binding to Signals
+
+```python
+from qtpy.QtCore import QTimer
+
+timer = QTimer()
+timer.setInterval(1000)
+timer.start()
+
+# Command executes on each timer signal
+timer.timeout << vm.increment
+```
+
 
 ---
 

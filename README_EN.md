@@ -104,6 +104,36 @@ button = QPushButton("Click me")
 click_count << button.clicked  # Each click increments click_count
 ```
 
+### 4. Using Command
+
+`Command` wraps ViewModel methods for binding to buttons with automatic disabling during execution.
+
+```python
+from qtmvvm import BaseViewModel, command
+from qtpy.QtWidgets import QPushButton
+
+class CounterViewModel(BaseViewModel):
+    count: int = 0
+
+    @command
+    def increment(self):
+        self.count += 1
+
+    @command
+    async def load_data(self):
+        import asyncio
+        await asyncio.sleep(1)  # Async operation
+
+vm = CounterViewModel()
+
+# Bind to buttons
+inc_btn = QPushButton("+")
+load_btn = QPushButton("Load")
+
+vm.increment << inc_btn    # Click → increment()
+vm.load_data << load_btn   # Button disabled during loading
+```
+
 ## Documentation
 
 - [Full Documentation (English)](DOCS_EN.md) — detailed API reference, all binding mixins, and advanced examples

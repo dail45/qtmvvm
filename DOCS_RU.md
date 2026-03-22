@@ -145,6 +145,50 @@ abs(x)      # 6.0
 
 `ComputedProperty` — это свойство только для чтения, которое автоматически обновляется при изменении зависимостей.
 
+### Декоратор `@computed_property`
+
+Удобный декоратор для создания вычисляемых свойств в ViewModel.
+
+```python
+from qtmvvm import BaseViewModel, computed_property
+
+class PersonViewModel(BaseViewModel):
+    first_name: str = "John"
+    last_name: str = "Doe"
+    age: int = 25
+
+    @computed_property(depends_on=["first_name", "last_name"])
+    def full_name(self):
+        return f"{self.first_name} {self.last_name}"
+
+    @computed_property(depends_on=["age"])
+    def is_adult(self):
+        return self.age >= 18
+
+    @computed_property(depends_on=["full_name", "is_adult"])
+    def display_info(self):
+        status = "взрослый" if self.is_adult else "ребёнок"
+        return f"{self.full_name} ({status})"
+
+vm = PersonViewModel()
+print(vm.full_name)      # "John Doe"
+print(vm.is_adult)       # True
+print(vm.display_info)   # "John Doe (взрослый)"
+
+vm.age = 17
+print(vm.is_adult)       # False (авто-обновление)
+print(vm.display_info)   # "John Doe (ребёнок)"
+```
+
+**Параметры:**
+- `depends_on` — список имён свойств/методов, от которых зависит вычисляемое свойство
+
+**Особенности:**
+- Автоматически пересчитывается при изменении зависимостей
+- Только для чтения (нельзя установить значение)
+- Поддерживает цепочки зависимостей
+- Обнаруживает циклические зависимости
+
 ### Использование декоратора
 
 ```python
@@ -184,6 +228,65 @@ sum_prop = ComputedProperty(
 )
 
 print(sum_prop.value)  # 15
+```
+
+### Продвинутые примеры
+
+**Цепочки вычисляемых свойств:**
+
+```python
+class CalculatorViewModel(BaseViewModel):
+    base: int = 10
+    multiplier: int = 2
+
+    @computed_property(depends_on=["base", "multiplier"])
+    def product(self):
+        return self.base * self.multiplier
+
+    @computed_property(depends_on=["product"])
+    def product_doubled(self):
+        return self.product * 2
+
+vm = CalculatorViewModel()
+print(vm.product)          # 20
+print(vm.product_doubled)  # 40
+
+vm.multiplier = 5
+print(vm.product)          # 50 (авто-обновление)
+print(vm.product_doubled)  # 100 (каскадное обновление)
+```
+
+**Валидация форм:**
+
+```python
+class LoginViewModel(BaseViewModel):
+    username: str = ""
+    password: str = ""
+    password_confirm: str = ""
+
+    @computed_property(depends_on=["username"])
+    def username_valid(self):
+        return len(self.username) >= 3
+
+    @computed_property(depends_on=["password"])
+    def password_valid(self):
+        return len(self.password) >= 8
+
+    @computed_property(depends_on=["password", "password_confirm"])
+    def passwords_match(self):
+        return self.password == self.password_confirm
+
+    @computed_property(depends_on=["username_valid", "password_valid", "passwords_match"])
+    def form_valid(self):
+        return self.username_valid and self.password_valid and self.passwords_match
+
+vm = LoginViewModel()
+print(vm.form_valid)  # False
+
+vm.username = "john"
+vm.password = "secret123"
+vm.password_confirm = "secret123"
+print(vm.form_valid)  # True
 ```
 
 ### Особенности
@@ -368,6 +471,46 @@ prop.bindText(edit, mode="2-way")  # Двусторонняя синхрониз
 
 `Command` оборачивает методы ViewModel для удобной привязки к кнопкам/сигналам с автоматическим управлением состоянием.
 
+### Декоратор `@command`
+
+Декоратор для превращения методов ViewModel в команды с поддержкой привязки к кнопкам и сигналам.
+
+```python
+from qtmvvm import BaseViewModel, command
+from qtpy.QtWidgets import QPushButton
+
+class CounterViewModel(BaseViewModel):
+    count: int = 0
+
+    @command
+    def increment(self):
+        self.count += 1
+
+    @command
+    def decrement(self):
+        self.count -= 1
+
+    @command
+    def reset(self):
+        self.count = 0
+
+vm = CounterViewModel()
+
+# Привязка к кнопкам
+inc_btn = QPushButton("+")
+dec_btn = QPushButton("-")
+reset_btn = QPushButton("Reset")
+
+vm.increment << inc_btn    # Клик → increment()
+vm.decrement << dec_btn    # Клик → decrement()
+vm.reset << reset_btn      # Клик → reset()
+```
+
+**Особенности:**
+- Автоматическая блокировка кнопки во время выполнения
+- Поддержка синхронных и асинхронных методов
+- Сигналы `started` и `finished` для отслеживания состояния
+
 ### Базовое использование
 
 ```python
@@ -411,30 +554,63 @@ timer.timeout << vm.increment  # Увеличение при каждом тай
 
 ### Асинхронные команды
 
+`@command` автоматически определяет асинхронные методы и выполняет их в фоновом потоке.
+
 ```python
 from qtmvvm import BaseViewModel, command
+import asyncio
 
-class MainViewModel(BaseViewModel):
-    status: str = ""
+class DataViewModel(BaseViewModel):
+    data: str = ""
+    is_loading: bool = False
 
     @command
-    async def load_data(self):
-        # Асинхронная операция
-        import asyncio
-        await asyncio.sleep(1)
-        self.status = "Загружено!"
+    async def load_data(self, url: str):
+        self.is_loading = True
+        try:
+            # Имитация сетевого запроса
+            await asyncio.sleep(1)
+            self.data = f"Данные из {url}"
+        finally:
+            self.is_loading = False
+
+vm = DataViewModel()
+
+# Кнопка автоматически блокируется на время загрузки
+load_btn = QPushButton("Загрузить")
+vm.load_data << load_btn
+
+# Отслеживание состояния
+vm.load_data.started.connect(lambda: print("Загрузка началась"))
+vm.load_data.finished.connect(lambda: print("Загрузка завершена"))
 ```
 
-### Состояние команды
+### Сигналы команды
 
 ```python
 cmd = vm.load_data
 
-print(cmd.is_running)  # Проверка выполнения
-
+# Подписка на события
 cmd.started.connect(lambda: print("Начато"))
 cmd.finished.connect(lambda: print("Завершено"))
+
+# Проверка состояния
+print(cmd.is_running)  # True во время выполнения
 ```
+
+### Привязка к сигналам
+
+```python
+from qtpy.QtCore import QTimer
+
+timer = QTimer()
+timer.setInterval(1000)
+timer.start()
+
+# Команда выполняется при каждом сигнале таймера
+timer.timeout << vm.increment
+```
+
 
 ---
 

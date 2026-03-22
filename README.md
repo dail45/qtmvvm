@@ -104,6 +104,36 @@ button = QPushButton("Click me")
 click_count << button.clicked  # Каждый клик увеличивает click_count
 ```
 
+### 4. Использование Command
+
+`Command` оборачивает методы ViewModel для привязки к кнопкам с автоматической блокировкой во время выполнения.
+
+```python
+from qtmvvm import BaseViewModel, command
+from qtpy.QtWidgets import QPushButton
+
+class CounterViewModel(BaseViewModel):
+    count: int = 0
+
+    @command
+    def increment(self):
+        self.count += 1
+
+    @command
+    async def load_data(self):
+        import asyncio
+        await asyncio.sleep(1)  # Асинхронная операция
+
+vm = CounterViewModel()
+
+# Привязка к кнопкам
+inc_btn = QPushButton("+")
+load_btn = QPushButton("Load")
+
+vm.increment << inc_btn    # Клик → increment()
+vm.load_data << load_btn   # Кнопка блокируется во время загрузки
+```
+
 ## Документация
 
 - [Полная документация (Русский)](DOCS_RU.md) — подробное API reference, все миксины биндингов и расширенные примеры
