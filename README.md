@@ -101,7 +101,7 @@ from qtpy.QtWidgets import QPushButton
 click_count = ObservableProperty(0)
 button = QPushButton("Click me")
 
-button.clicked << click_count  # Каждый клик увеличивает click_count
+click_count << button.clicked  # Каждый клик увеличивает click_count
 ```
 
 ## Документация

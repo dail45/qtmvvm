@@ -82,7 +82,7 @@ prop >> label
 prop @ text_input
 
 # Signal binding: signal -> property
-button.clicked << prop
+prop << button.clicked
 ```
 
 ---
@@ -300,7 +300,7 @@ from qtpy.QtWidgets import QPushButton
 click_count = ObservableProperty(0)
 button = QPushButton("Click me")
 
-button.clicked << click_count  # Each click increments count
+click_count << button.clicked  # Each click increments count
 ```
 
 ---
